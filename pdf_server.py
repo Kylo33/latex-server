@@ -9,10 +9,24 @@ import os
 import io
 import base64
 import logging
+import sys
 
 import pdf2image
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+file_handler = logging.handlers.RotatingFileHandler("app.log", maxBytes=20_000_000)
+file_handler.setLevel(logging.DEBUG)
+logger.addHandler(file_handler)
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+logger.addHandler(console_handler)
+
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
 
 # Create the app, disable CORS protection
 app = FastAPI()
@@ -41,7 +55,7 @@ def latex_to_images(source: str) -> str:
         with open(source_file_path, "w") as source_file:
             source_file.write(source)
 
-        logging.info(f"Wrote LaTeX source to {source_file_path}")
+        logger.info(f"Wrote LaTeX source to {source_file_path}")
 
         # Compile the source to a PDF
         output_name = "output"
@@ -60,7 +74,7 @@ def latex_to_images(source: str) -> str:
         # Convert the PDF to a list of Base64 encoded images
         output_path = os.path.join(working_dir, f"{output_name}.pdf")
 
-        logging.info(f"Compiled PDF to {output_path}")
+        logger.info(f"Compiled PDF to {output_path}")
 
         images = pdf2image.convert_from_path(output_path)
 
@@ -72,13 +86,15 @@ def latex_to_images(source: str) -> str:
         img_str = base64.b64encode(buffer.getvalue()).decode()
         encoded_images.append(img_str)
 
-    logging.info(f"Encoded {len(images)} images with Base64 encoding")
+    logger.info(f"Encoded {len(encoded_images)} images with Base64 encoding")
+    logger.debug(encoded_images)
     return encoded_images
 
 # Image rendering endpoint
 @app.post("/")
 def generate_images(data: LatexModel):
-    logging.info(f"Generating images from LaTeX source")
+    logger.info(f"Request to generate images from LaTeX source.")
+    logger.debug(data.latex)
     images = latex_to_images(data.latex)
     return {"slides": images}
 
